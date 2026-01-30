@@ -1,0 +1,7 @@
+[package]
+name = "stlcrts"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+stlcrts_macros = { path = "../stlcrts_macros" }

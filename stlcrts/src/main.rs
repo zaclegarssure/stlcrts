@@ -1,4 +1,5 @@
 use stlcrts::*;
+use stlcrts_macros::stlc;
 
 fn main() {
     type_checks::<
@@ -27,4 +28,14 @@ fn main() {
         >,
         True,
     >();
+
+    type_checks::<
+        stlc! {
+            let not = fn b: Bool -> if b then false else true in
+            let and = fn a: Bool -> fn b: Bool -> if a then b else false in
+            and true (not false)
+        },
+    >();
+
+    eval_to::<stlc! { 5 }, stlc! { 5 }>();
 }

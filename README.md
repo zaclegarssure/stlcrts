@@ -6,9 +6,7 @@ to write some program in it such as a type-checker for the stlc.
 
 ## Usage
 ```rust
-// For now the only thing that can be done is to type-check
-// a program, which just checks that the given generic implements the
-// WellTyped trait
+// Check that a term is well typed
 type_checks::<
     // let not = \b: Bool -> if b then false else true in
     Let<
@@ -21,17 +19,32 @@ type_checks::<
         >,
     >,
 >();
+
+// Check that a term evaluates to a given value
+eval_to::<
+    // let not = \b: Bool -> if b then false else true in
+    Let<
+        Lam<Bool, If<Var<I0>, False, True>>,
+        // let and = \a: Bool -> \b: Bool -> if a then b else false in
+        Let<
+            Lam<Bool, Lam<Bool, If<Var<ISucc<I0>>, Var<I0>, False>>>,
+            // and true (not false)
+            App<App<Var<I0>, True>, App<Var<ISucc<I0>>, False>>,
+        >,
+    >,
+    True,
+>();
+
+// Using fancy macro
+type_checks::<
+    stlc! {
+        let not = fn b: Bool -> if b then false else true in
+        let and = fn a: Bool -> fn b: Bool -> if a then b else false in
+        and true (not false)
+    },
+>();
 ```
 
 ## TODOs
-- A proc-macro to write stlc code with a nice syntax. The example above would become:
-  ```rust
-  stlc! {
-      let not = \b: Bool -> if b then false else true in
-      let and = \a: Bool -> \b: Bool -> if a then b else false in
-      and true (not false)
-  }
-  ```
-- More terms such as `pred`, `is_zero`, `let_rec`.
-- An interpreter written in traits
-- A Repl, by invoking `rustc` at runtime, because yeah that's the most normal thing to do.
+- More terms such as `pred`, `is_zero`, `fix`.
+- A Repl, by invoking `rustc` at runtime, because that's the most normal way to do it.
