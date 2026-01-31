@@ -42,10 +42,7 @@ fn main() {
     let _res = eval::<
         stlc! { let id = fn f: (Nat -> Bool) => fn n: Nat => f n in
                     let iszerofn2 = id iszero in
-                    if iszerofn2 0 then 1 else 2
+                    succ (if iszerofn2 0 then 1 else 2)
         },
     >();
-
-    // Test basic functionality still works
-    println!("Basic tests passed");
 }

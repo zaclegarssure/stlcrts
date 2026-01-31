@@ -46,6 +46,5 @@ type_checks::<
 ```
 
 ## TODOs
-- `succ` syntax
 - `fix`
 - A Repl, by invoking `rustc` at runtime, because that's the most normal way to do it.

@@ -134,6 +134,17 @@ impl<V: Value, D: Index> Subst<V, D> for False {
     type Res = False;
 }
 
+impl<V: Value, D: Index> Subst<V, D> for Zero {
+    type Res = Zero;
+}
+
+impl<V: Value, D: Index, T: Term, ST: Term> Subst<V, D> for Succ<T>
+where
+    T: Subst<V, D, Res = ST>,
+{
+    type Res = Succ<ST>;
+}
+
 // subst if c then th else el -> if subst c then subst th else subst el
 impl<V: Value, D: Index, Cond: Term, SCond: Term, Then: Term, SThen: Term, Else: Term, SElse: Term>
     Subst<V, D> for If<Cond, Then, Else>

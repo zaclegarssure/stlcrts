@@ -52,6 +52,7 @@ enum Expr {
         body: Box<Expr>,
     },
     IsZero(Box<Expr>),
+    Succ(Box<Expr>),
     Pred(Box<Expr>),
 }
 
@@ -60,6 +61,7 @@ mod kw {
     syn::custom_keyword!(Bool);
     syn::custom_keyword!(Nat);
     syn::custom_keyword!(iszero);
+    syn::custom_keyword!(succ);
     syn::custom_keyword!(pred);
 }
 
@@ -122,6 +124,14 @@ fn parse_application(input: ParseStream) -> Result<Expr> {
     Ok(expr)
 }
 
+fn eta_expand(tp: Tp, expr: impl Fn(Box<Expr>) -> Expr) -> Expr {
+    Expr::Lam {
+        param: "x".to_string(),
+        tp,
+        body: Box::new(expr(Box::new(Expr::Var("x".to_string())))),
+    }
+}
+
 fn parse_atom(input: ParseStream) -> Result<Expr> {
     if input.peek(LitBool) {
         let b: LitBool = input.parse()?;
@@ -138,19 +148,15 @@ fn parse_atom(input: ParseStream) -> Result<Expr> {
         input.parse::<kw::iszero>()?;
         // Little trick, but to make it possible for users to treat iszero
         // as a regular function we eta-expand it at parse time
-        Ok(Expr::Lam {
-            param: "x".to_string(),
-            tp: Tp::Nat,
-            body: Box::new(Expr::IsZero(Box::new(Expr::Var("x".to_string())))),
-        })
+        Ok(eta_expand(Tp::Nat, Expr::IsZero))
     } else if input.peek(kw::pred) {
         input.parse::<kw::pred>()?;
         // Same as above
-        Ok(Expr::Lam {
-            param: "x".to_string(),
-            tp: Tp::Nat,
-            body: Box::new(Expr::Pred(Box::new(Expr::Var("x".to_string())))),
-        })
+        Ok(eta_expand(Tp::Nat, Expr::Pred))
+    } else if input.peek(kw::succ) {
+        input.parse::<kw::succ>()?;
+        // Same as above
+        Ok(eta_expand(Tp::Nat, Expr::Succ))
     } else {
         let ident: Ident = input.parse()?;
         Ok(Expr::Var(ident.to_string()))
@@ -170,6 +176,7 @@ enum DBExpr {
     App(Box<DBExpr>, Box<DBExpr>),
     Let(Box<DBExpr>, Box<DBExpr>),
     IsZero(Box<DBExpr>),
+    Succ(Box<DBExpr>),
     Pred(Box<DBExpr>),
 }
 
@@ -213,6 +220,7 @@ fn lower(expr: &Expr, env: &mut Vec<String>) -> DBExpr {
         }
 
         Expr::IsZero(expr) => DBExpr::IsZero(Box::new(lower(expr, env))),
+        Expr::Succ(expr) => DBExpr::Succ(Box::new(lower(expr, env))),
         Expr::Pred(expr) => DBExpr::Pred(Box::new(lower(expr, env))),
     }
 }
@@ -292,6 +300,13 @@ impl DBExpr {
                 let e = expr.expand();
                 quote::quote! {
                     IsZero<#e>
+                }
+            }
+
+            DBExpr::Succ(expr) => {
+                let e = expr.expand();
+                quote::quote! {
+                    Succ<#e>
                 }
             }
 
