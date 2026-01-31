@@ -1,8 +1,7 @@
 # The Simply Typed Lambda Calculus in Rust Traits
-This is a type-checker for the simply typed lambda calculus with booleans
+This is a type-checker and an interpreter for the simply typed lambda calculus with booleans
 and natural numbers written in Rust's trait.
-I got the idea after discussing the Turing-completeness of Rust's type system with some colleagues and decided
-to write some program in it such as a type-checker for the stlc.
+I got the idea after discussing the Turing-completeness of Rust's type system with some colleagues.
 
 ## Usage
 ```rust
