@@ -52,6 +52,7 @@ enum Expr {
         body: Box<Expr>,
     },
     IsZero(Box<Expr>),
+    Pred(Box<Expr>),
 }
 
 mod kw {
@@ -59,6 +60,7 @@ mod kw {
     syn::custom_keyword!(Bool);
     syn::custom_keyword!(Nat);
     syn::custom_keyword!(iszero);
+    syn::custom_keyword!(pred);
 }
 
 impl Parse for Expr {
@@ -141,6 +143,14 @@ fn parse_atom(input: ParseStream) -> Result<Expr> {
             tp: Tp::Nat,
             body: Box::new(Expr::IsZero(Box::new(Expr::Var("x".to_string())))),
         })
+    } else if input.peek(kw::pred) {
+        input.parse::<kw::pred>()?;
+        // Same as above
+        Ok(Expr::Lam {
+            param: "x".to_string(),
+            tp: Tp::Nat,
+            body: Box::new(Expr::Pred(Box::new(Expr::Var("x".to_string())))),
+        })
     } else {
         let ident: Ident = input.parse()?;
         Ok(Expr::Var(ident.to_string()))
@@ -160,6 +170,7 @@ enum DBExpr {
     App(Box<DBExpr>, Box<DBExpr>),
     Let(Box<DBExpr>, Box<DBExpr>),
     IsZero(Box<DBExpr>),
+    Pred(Box<DBExpr>),
 }
 
 /// Lower an Expr into a DBExpr, in the environment
@@ -202,6 +213,7 @@ fn lower(expr: &Expr, env: &mut Vec<String>) -> DBExpr {
         }
 
         Expr::IsZero(expr) => DBExpr::IsZero(Box::new(lower(expr, env))),
+        Expr::Pred(expr) => DBExpr::Pred(Box::new(lower(expr, env))),
     }
 }
 
@@ -280,6 +292,13 @@ impl DBExpr {
                 let e = expr.expand();
                 quote::quote! {
                     IsZero<#e>
+                }
+            }
+
+            DBExpr::Pred(expr) => {
+                let e = expr.expand();
+                quote::quote! {
+                    Pred<#e>
                 }
             }
         }

@@ -37,7 +37,7 @@ fn main() {
         },
     >();
 
-    eval_to::<stlc! { 5 }, stlc! { 5 }>();
+    eval_to::<stlc! { pred 5 }, stlc! { 4 }>();
 
     let _res = eval::<
         stlc! { let id = fn f: (Nat -> Bool) => fn n: Nat => f n in

@@ -37,6 +37,14 @@ where
     type Tp = Bool;
 }
 
+// T-Pred
+impl<E: Env, T: Term> WellTyped<E> for Pred<T>
+where
+    T: WellTyped<E, Tp = Nat>,
+{
+    type Tp = Bool;
+}
+
 // T-VarSucc
 impl<N: Index, E: Env, Tp: Type> WellTyped<TyCons<Tp, E>> for Var<ISucc<N>>
 where

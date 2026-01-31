@@ -46,5 +46,6 @@ type_checks::<
 ```
 
 ## TODOs
-- More terms such as `pred`, `is_zero`, `fix`.
+- `succ` syntax
+- `fix`
 - A Repl, by invoking `rustc` at runtime, because that's the most normal way to do it.

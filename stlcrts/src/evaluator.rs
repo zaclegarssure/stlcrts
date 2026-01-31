@@ -59,6 +59,23 @@ where
     type Res = R;
 }
 
+trait PredResult {
+    type Res: Value;
+}
+impl PredResult for Zero {
+    type Res = Zero;
+}
+impl<V: Value> PredResult for Succ<V> {
+    type Res = V;
+}
+impl<T: Term, C: Ctx, V: Value, V2: Value> Eval<C> for Pred<T>
+where
+    T: Eval<C, Res = V>,
+    V: PredResult<Res = V2>,
+{
+    type Res = V2;
+}
+
 // E-VarSucc
 impl<N: Index, C: Ctx, V: Value, V2: Value> Eval<CtxCons<V, C>> for Var<ISucc<N>>
 where
@@ -149,6 +166,13 @@ where
     T: Subst<V, D, Res = ST>,
 {
     type Res = IsZero<ST>;
+}
+
+impl<V: Value, D: Index, T: Term, ST: Term> Subst<V, D> for Pred<T>
+where
+    T: Subst<V, D, Res = ST>,
+{
+    type Res = Pred<ST>;
 }
 
 // It's a bit of a mess, will comment later
