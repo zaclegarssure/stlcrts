@@ -100,16 +100,8 @@ impl<V: Value, D: Index> Subst<V, D> for False {
 }
 
 // subst if c then th else el -> if subst c then subst th else subst el
-impl<
-        V: Value,
-        D: Index,
-        Cond: Term,
-        SCond: Term,
-        Then: Term,
-        SThen: Term,
-        Else: Term,
-        SElse: Term,
-    > Subst<V, D> for If<Cond, Then, Else>
+impl<V: Value, D: Index, Cond: Term, SCond: Term, Then: Term, SThen: Term, Else: Term, SElse: Term>
+    Subst<V, D> for If<Cond, Then, Else>
 where
     Cond: Subst<V, D, Res = SCond>,
     Then: Subst<V, D, Res = SThen>,
@@ -185,6 +177,31 @@ where
     type Res = V2;
 }
 
+// For E-If we need to use a little trick,
+// because if we implement two rules E-True and E-False
+// then rustc will complain that there might be overallping
+// instances for Eval. Therefore we use a helper trait Select
+// wich given two terms selects the approriate one. For True
+// it selects the first and for False it selects the second.
+trait Select<T1: Term, T2: Term> {
+    type Res: Term;
+}
+impl<T1: Term, T2: Term> Select<T1, T2> for True {
+    type Res = T1;
+}
+impl<T1: Term, T2: Term> Select<T1, T2> for False {
+    type Res = T2;
+}
+impl<Cond: Term, V: Value, T1: Term, T2: Term, T3: Term, R: Value, C: Ctx> Eval<C>
+    for If<Cond, T1, T2>
+where
+    Cond: Eval<C, Res = V>,
+    V: Select<T1, T2, Res = T3>,
+    T3: Eval<C, Res = R>,
+{
+    type Res = R;
+}
+
 pub fn eval_to<T, V>()
 where
     V: Value,
@@ -193,25 +210,6 @@ where
 {
 }
 
-trait Select<T1: Term, T2: Term, C: Ctx> {
-    type Res: Value;
-}
-impl<T1: Term, T2: Term, V1: Value, C: Ctx> Select<T1, T2, C> for True
-where
-    T1: Eval<C, Res = V1>,
-{
-    type Res = V1;
-}
-impl<T1: Term, T2: Term, V2: Value, C: Ctx> Select<T1, T2, C> for False
-where
-    T2: Eval<C, Res = V2>,
-{
-    type Res = V2;
-}
-impl<Cond: Term, V: Value, T1: Term, T2: Term, R: Value, C: Ctx> Eval<C> for If<Cond, T1, T2>
-where
-    Cond: Eval<C, Res = V>,
-    V: Select<T1, T2, C, Res = R>,
-{
-    type Res = R;
+pub fn eval<T: Eval<EmptyCtx>>() -> PhantomData<T::Res> {
+    PhantomData
 }

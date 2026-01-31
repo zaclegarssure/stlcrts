@@ -38,4 +38,7 @@ fn main() {
     >();
 
     eval_to::<stlc! { 5 }, stlc! { 5 }>();
+
+    let _res: std::marker::PhantomData<Succ<Succ<Succ<Succ<Zero>>>>> =
+        eval::<stlc! { if true then 4 else 3 }>();
 }
