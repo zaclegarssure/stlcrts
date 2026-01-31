@@ -12,6 +12,9 @@ pub struct Succ<T: Term>(PhantomData<T>);
 impl Term for Zero {}
 impl<T: Term> Term for Succ<T> {}
 
+pub struct IsZero<T: Term>(PhantomData<T>);
+impl<T: Term> Term for IsZero<T> {}
+
 // De Bruijn indices
 pub trait Index {}
 pub struct I0;

@@ -3,6 +3,37 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
+#[derive(Clone)]
+enum Tp {
+    Bool,
+    Nat,
+    Arrow(Box<Tp>, Box<Tp>),
+}
+
+impl Parse for Tp {
+    fn parse(input: ParseStream) -> Result<Self> {
+        if input.peek(kw::Bool) {
+            input.parse::<kw::Bool>()?;
+            Ok(Tp::Bool)
+        } else if input.peek(kw::Nat) {
+            input.parse::<kw::Nat>()?;
+            Ok(Tp::Nat)
+        } else if input.peek(syn::token::Paren) {
+            let content;
+            syn::parenthesized!(content in input);
+            let left = content.parse()?;
+            content.parse::<Token![->]>()?;
+            let right = content.parse()?;
+            Ok(Tp::Arrow(Box::new(left), Box::new(right)))
+        } else {
+            Err(syn::Error::new(
+                input.span(),
+                "expected type (Bool, Nat, or (Tp -> Tp))",
+            ))
+        }
+    }
+}
+
 /// AST Obtained from the macro, which uses string as names rather than indices
 enum Expr {
     Bool(bool),
@@ -11,6 +42,7 @@ enum Expr {
     If(Box<Expr>, Box<Expr>, Box<Expr>),
     Lam {
         param: String,
+        tp: Tp,
         body: Box<Expr>,
     },
     App(Box<Expr>, Box<Expr>),
@@ -19,11 +51,14 @@ enum Expr {
         value: Box<Expr>,
         body: Box<Expr>,
     },
+    IsZero(Box<Expr>),
 }
 
 mod kw {
     syn::custom_keyword!(then);
     syn::custom_keyword!(Bool);
+    syn::custom_keyword!(Nat);
+    syn::custom_keyword!(iszero);
 }
 
 impl Parse for Expr {
@@ -56,11 +91,12 @@ impl Parse for Expr {
             input.parse::<Token![fn]>()?;
             let param: Ident = input.parse()?;
             input.parse::<Token![:]>()?;
-            input.parse::<Ident>()?; // Bool (ignored for now)
-            input.parse::<Token![->]>()?;
+            let tp: Tp = input.parse()?;
+            input.parse::<Token![=>]>()?;
             let body = input.parse()?;
             Ok(Expr::Lam {
                 param: param.to_string(),
+                tp,
                 body: Box::new(body),
             })
         } else {
@@ -96,6 +132,15 @@ fn parse_atom(input: ParseStream) -> Result<Expr> {
         let n: LitInt = input.parse()?;
         let value = n.base10_parse::<u64>()?;
         Ok(Expr::Nat(value))
+    } else if input.peek(kw::iszero) {
+        input.parse::<kw::iszero>()?;
+        // Little trick, but to make it possible for users to treat iszero
+        // as a regular function we eta-expand it at parse time
+        Ok(Expr::Lam {
+            param: "x".to_string(),
+            tp: Tp::Nat,
+            body: Box::new(Expr::IsZero(Box::new(Expr::Var("x".to_string())))),
+        })
     } else {
         let ident: Ident = input.parse()?;
         Ok(Expr::Var(ident.to_string()))
@@ -111,9 +156,10 @@ enum DBExpr {
     Nat(u64),
     Var(usize),
     If(Box<DBExpr>, Box<DBExpr>, Box<DBExpr>),
-    Lam(Box<DBExpr>),
+    Lam(Tp, Box<DBExpr>),
     App(Box<DBExpr>, Box<DBExpr>),
     Let(Box<DBExpr>, Box<DBExpr>),
+    IsZero(Box<DBExpr>),
 }
 
 /// Lower an Expr into a DBExpr, in the environment
@@ -138,11 +184,11 @@ fn lower(expr: &Expr, env: &mut Vec<String>) -> DBExpr {
             Box::new(lower(e, env)),
         ),
 
-        Expr::Lam { param, body } => {
+        Expr::Lam { param, tp, body } => {
             env.push(param.clone());
             let b = lower(body, env);
             env.pop();
-            DBExpr::Lam(Box::new(b))
+            DBExpr::Lam(tp.clone(), Box::new(b))
         }
 
         Expr::App(f, x) => DBExpr::App(Box::new(lower(f, env)), Box::new(lower(x, env))),
@@ -154,6 +200,8 @@ fn lower(expr: &Expr, env: &mut Vec<String>) -> DBExpr {
             env.pop();
             DBExpr::Let(Box::new(v), Box::new(b))
         }
+
+        Expr::IsZero(expr) => DBExpr::IsZero(Box::new(lower(expr, env))),
     }
 }
 
@@ -163,6 +211,18 @@ fn index_type(n: usize) -> proc_macro2::TokenStream {
         ts = quote::quote! { ISucc<#ts> };
     }
     ts
+}
+
+fn expand_type(tp: &Tp) -> proc_macro2::TokenStream {
+    match tp {
+        Tp::Bool => quote::quote! { Bool },
+        Tp::Nat => quote::quote! { Nat },
+        Tp::Arrow(from, to) => {
+            let from = expand_type(from);
+            let to = expand_type(to);
+            quote::quote! { Arrow<#from, #to> }
+        }
+    }
 }
 
 impl DBExpr {
@@ -192,10 +252,11 @@ impl DBExpr {
                 }
             }
 
-            DBExpr::Lam(body) => {
+            DBExpr::Lam(tp, body) => {
                 let b = body.expand();
+                let tp_tokens = expand_type(tp);
                 quote::quote! {
-                    Lam<Bool, #b>
+                    Lam<#tp_tokens, #b>
                 }
             }
 
@@ -212,6 +273,13 @@ impl DBExpr {
                 let b = b.expand();
                 quote::quote! {
                     Let<#v, #b>
+                }
+            }
+
+            DBExpr::IsZero(expr) => {
+                let e = expr.expand();
+                quote::quote! {
+                    IsZero<#e>
                 }
             }
         }

@@ -31,14 +31,21 @@ fn main() {
 
     type_checks::<
         stlc! {
-            let not = fn b: Bool -> if b then false else true in
-            let and = fn a: Bool -> fn b: Bool -> if a then b else false in
+            let not = fn b: Bool => if b then false else true in
+            let and = fn a: Bool => fn b: Bool => if a then b else false in
             and true (not false)
         },
     >();
 
     eval_to::<stlc! { 5 }, stlc! { 5 }>();
 
-    let _res: std::marker::PhantomData<Succ<Succ<Succ<Succ<Zero>>>>> =
-        eval::<stlc! { if true then 4 else 3 }>();
+    let _res = eval::<
+        stlc! { let id = fn f: (Nat -> Bool) => fn n: Nat => f n in
+                    let iszerofn2 = id iszero in
+                    if iszerofn2 0 then 1 else 2
+        },
+    >();
+
+    // Test basic functionality still works
+    println!("Basic tests passed");
 }

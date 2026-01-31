@@ -41,6 +41,24 @@ where
     type Res = Succ<V>;
 }
 
+trait IsZeroResult {
+    type Res: Value;
+}
+impl IsZeroResult for Zero {
+    type Res = True;
+}
+impl<T: Term> IsZeroResult for Succ<T> {
+    type Res = False;
+}
+
+impl<T: Term, C: Ctx, V: Value, R: Value> Eval<C> for IsZero<T>
+where
+    T: Eval<C, Res = V>,
+    V: IsZeroResult<Res = R>,
+{
+    type Res = R;
+}
+
 // E-VarSucc
 impl<N: Index, C: Ctx, V: Value, V2: Value> Eval<CtxCons<V, C>> for Var<ISucc<N>>
 where
@@ -124,6 +142,13 @@ where
     A: Subst<V, D, Res = SA>,
 {
     type Res = App<SF, SA>;
+}
+
+impl<V: Value, D: Index, T: Term, ST: Term> Subst<V, D> for IsZero<T>
+where
+    T: Subst<V, D, Res = ST>,
+{
+    type Res = IsZero<ST>;
 }
 
 // It's a bit of a mess, will comment later
