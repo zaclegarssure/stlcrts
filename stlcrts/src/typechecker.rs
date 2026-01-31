@@ -42,7 +42,7 @@ impl<E: Env, T: Term> WellTyped<E> for Pred<T>
 where
     T: WellTyped<E, Tp = Nat>,
 {
-    type Tp = Bool;
+    type Tp = Nat;
 }
 
 // T-VarSucc
@@ -92,6 +92,14 @@ where
     T: WellTyped<E, Tp = Tp>,
 {
     type Tp = <Body as WellTyped<TyCons<Tp, E>>>::Tp;
+}
+
+// T-Fix
+impl<E: Env, Tp: Type, T: Term> WellTyped<E> for Fix<T>
+where
+    T: WellTyped<E, Tp = Arrow<Tp, Tp>>,
+{
+    type Tp = Tp;
 }
 
 /// Util function to type-check a given term (given as a generic argument)

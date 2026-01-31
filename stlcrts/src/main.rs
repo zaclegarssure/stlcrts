@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use stlcrts::*;
 use stlcrts_macros::stlc;
 
@@ -41,9 +43,20 @@ fn main() {
         },
     >();
 
+    let _res = eval::<stlc! { iszero 0 }>();
+
+    eval_to::<
+        stlc! {
+            let add = fix (fn add: (Nat -> (Nat -> Nat)) => fn a: Nat => fn b: Nat =>
+                if iszero a then b else succ (add (pred a) b)
+            ) in add 3 15
+        },
+        stlc! { 18 },
+    >();
+
     eval_to::<stlc! { pred 5 }, stlc! { 4 }>();
 
-    let _res = eval::<
+    let _res: std::marker::PhantomData<stlc! { 2 }> = eval::<
         stlc! { let id = fn f: (Nat -> Bool) => fn n: Nat => f n in
                     let iszerofn2 = id iszero in
                     succ (if iszerofn2 0 then 1 else 2)

@@ -51,6 +51,7 @@ enum Expr {
         value: Box<Expr>,
         body: Box<Expr>,
     },
+    Fix(Box<Expr>),
     IsZero(Box<Expr>),
     Succ(Box<Expr>),
     Pred(Box<Expr>),
@@ -58,6 +59,7 @@ enum Expr {
 
 mod kw {
     syn::custom_keyword!(then);
+    syn::custom_keyword!(fix);
     syn::custom_keyword!(Bool);
     syn::custom_keyword!(Nat);
     syn::custom_keyword!(iszero);
@@ -157,6 +159,10 @@ fn parse_atom(input: ParseStream) -> Result<Expr> {
         input.parse::<kw::succ>()?;
         // Same as above
         Ok(eta_expand(Tp::Nat, Expr::Succ))
+    } else if input.peek(kw::fix) {
+        input.parse::<kw::fix>()?;
+        let arg = input.parse()?;
+        Ok(Expr::Fix(Box::new(arg)))
     } else {
         let ident: Ident = input.parse()?;
         Ok(Expr::Var(ident.to_string()))
@@ -175,6 +181,7 @@ enum DBExpr {
     Lam(Tp, Box<DBExpr>),
     App(Box<DBExpr>, Box<DBExpr>),
     Let(Box<DBExpr>, Box<DBExpr>),
+    Fix(Box<DBExpr>),
     IsZero(Box<DBExpr>),
     Succ(Box<DBExpr>),
     Pred(Box<DBExpr>),
@@ -217,6 +224,10 @@ fn lower(expr: &Expr, env: &mut Vec<String>) -> DBExpr {
             let b = lower(body, env);
             env.pop();
             DBExpr::Let(Box::new(v), Box::new(b))
+        }
+        Expr::Fix(t) => {
+            let t = lower(t, env);
+            DBExpr::Fix(Box::new(t))
         }
 
         Expr::IsZero(expr) => DBExpr::IsZero(Box::new(lower(expr, env))),
@@ -293,6 +304,13 @@ impl DBExpr {
                 let b = b.expand();
                 quote::quote! {
                     Let<#v, #b>
+                }
+            }
+
+            DBExpr::Fix(t) => {
+                let t = t.expand();
+                quote::quote! {
+                    Fix<#t>
                 }
             }
 

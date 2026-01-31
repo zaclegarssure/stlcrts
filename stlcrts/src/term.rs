@@ -42,6 +42,9 @@ impl<F: Term, A: Term> Term for App<F, A> {}
 pub struct Let<T: Term, Body: Term>(PhantomData<(T, Body)>);
 impl<T: Term, Body: Term> Term for Let<T, Body> {}
 
+pub struct Fix<T: Term>(PhantomData<T>);
+impl<T: Term> Term for Fix<T> {}
+
 pub trait Type {}
 
 pub struct Bool;

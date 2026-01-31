@@ -111,6 +111,13 @@ mod shiftby1 {
     {
         type Res = Let<T1prime, T2prime>;
     }
+
+    impl<C: Index, T: Term, Tprime: Term> Shift<C> for Fix<T>
+    where
+        T: Shift<C, Res = Tprime>,
+    {
+        type Res = Fix<Tprime>;
+    }
 }
 
 mod subst {
@@ -221,6 +228,13 @@ mod subst {
     {
         type Res = Let<T1prime, T2prime>;
     }
+
+    impl<J: Index, S: Term, T: Term, Tprime: Term> Subst<J, S> for Fix<T>
+    where
+        T: Subst<J, S, Res = Tprime>,
+    {
+        type Res = Fix<Tprime>;
+    }
 }
 
 mod shiftbyneg1 {
@@ -322,6 +336,13 @@ mod shiftbyneg1 {
     {
         type Res = Let<T1prime, T2prime>;
     }
+
+    impl<C: Index, T: Term, Tprime: Term> Shift<C> for Fix<T>
+    where
+        T: Shift<C, Res = Tprime>,
+    {
+        type Res = Fix<Tprime>;
+    }
 }
 
 pub trait Eval {
@@ -366,7 +387,7 @@ where
     type Res = Rprime;
 }
 
-// // E-Let
+// E-Let
 impl<T1: Term, V1: Value, T2: Term, V1prime: Term, T2prime: Term, T2primeprime: Term, Rprime: Value>
     Eval for Let<T1, T2>
 where
@@ -377,6 +398,15 @@ where
     T2primeprime: Eval<Res = Rprime>,
 {
     type Res = Rprime;
+}
+
+// E-Fix
+impl<T: Term, Tp: Type, T1: Term, R: Value> Eval for Fix<T>
+where
+    T: Eval<Res = Lam<Tp, T1>>,
+    T1: Subst<I0, Fix<Lam<Tp, T1>>, Res = R>,
+{
+    type Res = R;
 }
 
 // For E-If we need to use a little trick,
