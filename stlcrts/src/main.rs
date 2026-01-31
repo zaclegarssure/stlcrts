@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use stlcrts::*;
 use stlcrts_macros::stlc;
 
@@ -38,7 +36,7 @@ fn main() {
     type_checks::<
         stlc! {
             let not = fn b: Bool => if b then false else true in
-            let and = fn a: Bool => fn b: Bool => if a then b else false in
+            let and (a: Bool) (b: Bool) = if a then b else false in
             and true (not false)
         },
     >();
@@ -47,11 +45,27 @@ fn main() {
 
     eval_to::<
         stlc! {
-            let add = fix (fn add: (Nat -> (Nat -> Nat)) => fn a: Nat => fn b: Nat =>
+            let rec add (a: Nat) (b: Nat) : Nat  =
                 if iszero a then b else succ (add (pred a) b)
-            ) in add 3 15
+             in add 3 15
         },
         stlc! { 18 },
+    >();
+
+    eval_to::<
+        stlc! {
+            let rec add (a: Nat) (b: Nat) : Nat =
+                if iszero a then b else succ (add (pred a) b)
+            in
+            let rec mul (a: Nat) (b: Nat) : Nat =
+                if iszero a then 0 else add b (mul (pred a) b)
+            in
+            let rec fact (a: Nat) : Nat =
+                if iszero a then 1 else mul a (fact (pred a))
+            in
+            fact 3
+        },
+        stlc! { 6 },
     >();
 
     eval_to::<stlc! { pred 5 }, stlc! { 4 }>();

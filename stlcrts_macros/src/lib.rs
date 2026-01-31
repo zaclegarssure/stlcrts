@@ -3,7 +3,7 @@ use syn::{
     parse::{Parse, ParseStream},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum Tp {
     Bool,
     Nat,
@@ -35,6 +35,7 @@ impl Parse for Tp {
 }
 
 /// AST Obtained from the macro, which uses string as names rather than indices
+#[derive(Debug)]
 enum Expr {
     Bool(bool),
     Nat(u64),
@@ -51,6 +52,14 @@ enum Expr {
         value: Box<Expr>,
         body: Box<Expr>,
     },
+    LetFn {
+        name: String,
+        params: Vec<(String, Tp)>,
+        return_type: Option<Tp>,
+        body: Box<Expr>,
+        scope: Box<Expr>,
+        is_rec: bool,
+    },
     Fix(Box<Expr>),
     IsZero(Box<Expr>),
     Succ(Box<Expr>),
@@ -65,22 +74,63 @@ mod kw {
     syn::custom_keyword!(iszero);
     syn::custom_keyword!(succ);
     syn::custom_keyword!(pred);
+    syn::custom_keyword!(rec);
 }
 
 impl Parse for Expr {
     fn parse(input: ParseStream) -> Result<Self> {
         if input.peek(Token![let]) {
             input.parse::<Token![let]>()?;
+            let is_rec = input.peek(kw::rec);
+            if is_rec {
+                input.parse::<kw::rec>()?;
+            }
             let name: Ident = input.parse()?;
-            input.parse::<Token![=]>()?;
-            let value = input.parse()?;
-            input.parse::<Token![in]>()?;
-            let body = input.parse()?;
-            Ok(Expr::Let {
-                name: name.to_string(),
-                value: Box::new(value),
-                body: Box::new(body),
-            })
+
+            // Check if this is a function definition with parameters
+            if input.peek(syn::token::Paren) {
+                let mut params = Vec::new();
+                while input.peek(syn::token::Paren) {
+                    let content;
+                    syn::parenthesized!(content in input);
+                    let param: Ident = content.parse()?;
+                    content.parse::<Token![:]>()?;
+                    let tp: Tp = content.parse()?;
+                    params.push((param.to_string(), tp));
+                }
+
+                let return_type = if input.peek(Token![:]) {
+                    input.parse::<Token![:]>()?;
+                    Some(input.parse::<Tp>()?)
+                } else {
+                    None
+                };
+
+                input.parse::<Token![=]>()?;
+                let body = input.parse()?;
+                input.parse::<Token![in]>()?;
+                let scope = input.parse()?;
+
+                Ok(Expr::LetFn {
+                    name: name.to_string(),
+                    params,
+                    return_type,
+                    body: Box::new(body),
+                    scope: Box::new(scope),
+                    is_rec,
+                })
+            } else {
+                // Regular let binding
+                input.parse::<Token![=]>()?;
+                let value = input.parse()?;
+                input.parse::<Token![in]>()?;
+                let body = input.parse()?;
+                Ok(Expr::Let {
+                    name: name.to_string(),
+                    value: Box::new(value),
+                    body: Box::new(body),
+                })
+            }
         } else if input.peek(Token![if]) {
             input.parse::<Token![if]>()?;
             let cond = input.parse()?;
@@ -222,6 +272,60 @@ fn lower(expr: &Expr, env: &mut Vec<String>) -> DBExpr {
             let v = lower(value, env);
             env.push(name.clone());
             let b = lower(body, env);
+            env.pop();
+            DBExpr::Let(Box::new(v), Box::new(b))
+        }
+        Expr::LetFn {
+            name,
+            params,
+            return_type,
+            body,
+            scope,
+            is_rec,
+        } => {
+            // For recursive functions, add the function name to environment
+            if *is_rec {
+                env.push(name.clone());
+            }
+
+            // Add parameters to environment before lowering the body
+            for (param, _) in params.iter() {
+                env.push(param.clone());
+            }
+
+            // Lower the body with parameters in environment
+            let mut func_expr = lower(body, env);
+
+            // Remove parameters from environment
+            for _ in params.iter() {
+                env.pop();
+            }
+
+            // Remove function name from environment if it was added
+            if *is_rec {
+                env.pop();
+            }
+
+            // Convert to nested lambdas
+            for (_param, tp) in params.iter().rev() {
+                func_expr = DBExpr::Lam(tp.clone(), Box::new(func_expr));
+            }
+
+            if *is_rec {
+                // Create fix expression for recursive functions
+                let func_type = params.iter().rev().fold(
+                    return_type.clone().unwrap(),
+                    |acc: Tp, (_, tp): &(String, Tp)| {
+                        Tp::Arrow(Box::new(tp.clone()), Box::new(acc))
+                    },
+                );
+                func_expr = DBExpr::Fix(Box::new(DBExpr::Lam(func_type, Box::new(func_expr))));
+            }
+
+            // Create let binding
+            let v = func_expr;
+            env.push(name.clone());
+            let b = lower(scope, env);
             env.pop();
             DBExpr::Let(Box::new(v), Box::new(b))
         }
