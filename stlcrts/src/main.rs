@@ -15,6 +15,10 @@ fn main() {
         >,
     >();
 
+    eval_to::<App<Lam<Arrow<Bool, Bool>, Var<I0>>, Lam<Bool, Var<I0>>>, Lam<Bool, Var<I0>>>();
+
+    eval_to::<stlc! {(fn b: Bool => if b then false else true)(true)}, False>();
+
     eval_to::<
         // let not = \b: Bool -> if b then false else true in
         Let<
